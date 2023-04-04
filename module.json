@@ -78,9 +78,9 @@
     }
   ],
   "socket": true,
-  "url": "https://github.com/rinnocenti/innocenti-looting/",
-  "manifest": "https://raw.githubusercontent.com/rinnocenti/innocenti-looting/main/module.json",
-  "download": "https://github.com/rinnocenti/innocenti-looting/archive/refs/heads/main.zip",
-  "bugs": "https://github.com/rinnocenti/innocenti-looting/issues",
-  "readme": "https://github.com/rinnocenti/innocenti-looting/blob/main/README.md"
+  "url": "https://github.com/pdelva20/innocenti-looting/",
+  "manifest": "https://raw.githubusercontent.com/pdelva20/innocenti-looting/main/module.json",
+  "download": "https://github.com/pdelva20/innocenti-looting/archive/refs/heads/main.zip",
+  "bugs": "https://github.com/pdelva20/innocenti-looting/issues",
+  "readme": "https://github.com/pdelva20/innocenti-looting/blob/main/README.md"
 }
