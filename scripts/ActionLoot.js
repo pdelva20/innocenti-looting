@@ -36,12 +36,12 @@ export class ActionLoot {
                 // Morto - lootiar
                 titleChat = game.i18n.localize('Looting.MsgChat.looting');
                 let readyloot = entity.document.getFlag(SETTINGS.MODULE_NAME, SETTINGS.LOOT); //lootFlag ?.looting;
-                if (readyloot) return ui.notifications.warn(game.i18n.format("Looting.Errors.invalidCheck", { token: entity.name })); // j· foi lootiado.
+                if (readyloot) return ui.notifications.warn(game.i18n.format("Looting.Errors.invalidCheck", { token: entity.name })); // j√° foi lootiado.
                 await this.LootNPC(entity.actor, this.actor);
             } else {
                 ui.notifications.warn(game.i18n.localize('Looting.Errors.isalive'))
                 // vivo - Roubar
-                if (entity.actor._getSheetClass().name == SETTINGS.MODULE_LOOT_SHEET) return; // n„o È um bau ou mercador.
+                if (entity.actor._getSheetClass().name == SETTINGS.MODULE_LOOT_SHEET) return; // n√£o √© um bau ou mercador.
                 //this.AttempPickpocket(entity.actor, this.actor);
             }
             await this.AttempItemRemove(entity.actor);
@@ -62,7 +62,7 @@ export class ActionLoot {
         // criar um dialogo para verificar se o jogador quer mesmo fzer o pickpocket
         let d = new Dialog({
             title: "PickPocket",
-            content: "<p>O alvo ainda est· conciente e pode reagir, VocÍ tem certeza que deseja roubar os alvos?</p>",
+            content: "<p>O alvo ainda est√° conciente e pode reagir, Voc√™ tem certeza que deseja roubar os alvos?</p>",
             buttons: {
                 one: {
                     icon: '<i class="fas fa-check"></i>',
@@ -71,7 +71,7 @@ export class ActionLoot {
                 },
                 two: {
                     icon: '<i class="fas fa-times"></i>',
-                    label: "N„o",
+                    label: "N√£o",
                     callback: () => console.log("Cancel Pickpoket")
                 }
             },
@@ -173,60 +173,71 @@ export class ActionLoot {
             }
         }
         return ac;
-    }
-
-    async ConvertItems2TableLoot(tableroll) {
-        let nItems = [];
-        let table = game.tables.getName(tableroll);
-        if (this.betterTables && this.betterTables.active) {
-            //Bettertable
-            let re = await table.roll();
-            let result = await re.results;
-            //console.log(result);
-            for (let r of result) {
-                let packs = game.packs.get(r.collection);
-                let entity = (packs) ? await packs.getEntity(r.resultId) : game.items.get(r.resultId);
-                if (!entity) return ui.notifications.error(game.i18n.localize('Looting.Errors.notItem'));
-                let matches = entity.name.match(/\([a-z]{1,2}\)$/gs);
-                if (matches) {
-                    let coin = matches[0].substring(1, matches[0].length - 1);
-                    this.ConvertItens2Coins(coin, entity);
-                } else {
-                    nItems.push(entity);
+  }
+    /**
+     * search the list of inventories for special items for conversions such as currency-type item and table-type item
+     * @param {any} items
+     * @param {any} currencys
+     */
+    async ConvertLoots(items, currencys = {}) {
+        // Convert tables sorts
+        let nitem = new Set();
+        for (var i = 0; i < items.length; i++) {
+            let matches = items[i].name.match(/Table:?\s([\w\s\S]+)/is);
+            if (matches == null) {
+                //nitem.add(items[i]); continue;
+                let currency = await this.ItemCurrency2Coins(items[i], currencys);
+                if (currency == false) {
+                    nitem.add(items[i]); continue;
                 }
+                this.currency = SumObjectsByKey(this.currency, currency)
+                continue;
             }
-        } else {
-            //Vanilla
-            let re = await table.roll();
-            let result = await re.results;
+            let table = game.tables.getName(matches[1].trim());
+            let re = await table.draw();
+            let result = re.results;
             for (let r of result) {
-                console.log(r, "item");
                 let packs = game.packs.get(r.data.collection);
                 let entity = (packs) ? await packs.getDocument(r.data.resultId) : game.items.get(r.data.resultId);
-                console.log(entity, packs);
-                let matches = entity.name.match(/\([a-z]{1,2}\)$/gs);
-                if (matches) {
-                    let coin = matches[0].substring(1, matches[0].length - 1);
-                    this.ConvertItens2Coins(coin, entity);
-                } else {
-                    nItems.push(entity);
+                if (!entity) return ui.notifications.error(game.i18n.localize('Looting.Errors.notItem'));
+                if (this.modules['better-rolltables']) {
+                    let formula = r.data.flags["better-rolltables"]["brt-result-formula"].formula;
+                    let roll = new Roll(formula)
+                    let total = await roll.evaluate({ async: true });
+                    let itemData = (foundryVersion >= 10) ? entity.system : entity.data.data;
+                    itemData.quantity = total.total;
                 }
+                let currency = await this.ItemCurrency2Coins(entity, currencys);
+                if (currency == false) {
+                    nitem.add(entity); continue;
+                }
+                this.currency = SumObjectsByKey(this.currency, currency)
+                continue;
             }
         }
-        //console.log("items", nItems);
-        //console.log(this.lootCurrency);
-        return nItems;
+        return nitem;
     }
-
-    ConvertItens2Coins(coin, item) {
-        if (!this.lootCurrency[`${coin}`]) this.lootCurrency[`${coin}`] = 0;
-        if (item.data.data.source.match(/[dkfhxo]{1}[0-9\s\+\-\*\/]+/gs)) {
-            let r = new Roll(item.data.data.source);
-            this.lootCurrency[`${coin}`] += r.evaluate({async: false}).total;
-        } else {
-            this.lootCurrency[`${coin}`] += item.data.data.quantity;
+    /**
+     * Returns the currency value for the item with end text "(gp)"
+     * @param {any} item - object item type
+     * @param {any} currencys - array for cyrrency system
+     */
+    async ItemCurrency2Coins(item, currencys = {}) {
+        let matches = item.name.match(/\(([^)][a-z]{1,2})\)$/);
+        if (matches == null) return false;
+        let currency = {};
+        if (matches[1] in currencys) {
+            if (!currency[`${matches[1]}`]) currency[`${matches[1]}`] = 0;
+            let itemData = (foundryVersion >= 10) ? item.system : item.data.data;
+            if (Roll.validate(itemData.source)) {
+                let r = new Roll(itemData.source);
+                let total = await r.evaluate({ async: true });
+                currency[`${matches[1]}`] += total.total;
+            } else {
+                currency[`${matches[1]}`] += itemData.quantity;
+            }
+            return currency;
         }
-    }
 
     ResultChat(titleChat, items, targetName, currency) {
         let title = titleChat + '- ' + targetName;
