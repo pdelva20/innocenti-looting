@@ -11,7 +11,7 @@
     "invalidCheck": "{token} already been looted",
     "isalive": "The target is alive!",
     "thesame": "the looting token is the same as the loot token",
-    "notItem": "the item not exist in world"
+    "notItem": "the item does not exist in this world"
   },
   "Looting.Settings": {
     "percentWeapon": "Weapons Loot (%)",
